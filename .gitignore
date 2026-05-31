@@ -5,7 +5,10 @@ __pycache__/
 
 # Virtual environments
 venv/
-.env/
+.venv/
+
+# Local variables including secrets
+/.env
 
 # Editor settings
 .vscode/

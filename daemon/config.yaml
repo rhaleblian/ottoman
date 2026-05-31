@@ -5,6 +5,9 @@ watch_directories:
 # Local cache directory for downloaded models
 cache_directory: "/app/daemon/cache"
 
+# Root models directory (models are organized as {models_directory}/{type}/{name})
+models_directory: "/app/daemon/cache"
+
 # Model resolution endpoints
 model_sources:
   - name: "civitai"

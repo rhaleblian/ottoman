@@ -20,18 +20,17 @@ class ModelDownloader:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         logging.info(f"Model cache directory: {self.cache_dir}")
 
-    def ensure_present(self, model_id: str, url: str):
+    def ensure_present(self, target: Path, url: str):
         """
-        Ensure the model file exists locally.
-        If missing, download it.
+        Ensure the model file exists at *target*.
+        If missing, download it from *url*.
         """
-        target = self.cache_dir / f"{model_id}.bin"
-
         if target.exists():
-            logging.debug(f"Model already cached: {model_id}")
+            logging.debug(f"Model already exists: {target}")
             return
 
-        logging.info(f"Downloading model {model_id} from {url}")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        logging.info(f"Downloading {target.name} from {url}")
         self._download_with_retries(url, target)
 
     def _download_with_retries(self, url: str, target: Path):
