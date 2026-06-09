@@ -5,9 +5,9 @@ services:
       dockerfile: Dockerfile
     container_name: comfy-model-daemon
     volumes:
-      - ./daemon:/app/daemon
-      - /mnt/d/comfy/models:/app/daemon/cache
-      - /mnt/d/comfy/user/default/workflows:/app/host_workflows
+      - ${COMFY_INPUT_DIR}:/app/input
+      - ${COMFY_MODELS_DIR}:/app/models
+      - ${COMFY_WORKFLOWS_DIR}:/app/workflows
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
