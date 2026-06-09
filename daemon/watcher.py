@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from typing import List
 
-from .workflow_models import get_workflow_models
+from .workflow_models import get_workflow_models, get_workflow_inputs, download_workflow_inputs
 
 
 class WorkflowWatcher:
@@ -14,16 +14,19 @@ class WorkflowWatcher:
     resolves them to URLs, and triggers downloads.
     """
 
-    def __init__(self, directories: List[str], resolver, downloader, state, models_dir: str):
+    def __init__(self, directories: List[str], resolver, downloader, state,
+                 models_dir: str, input_dir: str):
         self.directories = [Path(d) for d in directories]
         self.resolver = resolver
         self.downloader = downloader
         self.state = state
         self.models_dir = Path(models_dir)
+        self.input_dir = Path(input_dir)
 
         for d in self.directories:
             d.mkdir(parents=True, exist_ok=True)
         self.models_dir.mkdir(parents=True, exist_ok=True)
+        self.input_dir.mkdir(parents=True, exist_ok=True)
 
         logging.info(f"Watching {len(self.directories)} workflow directories")
 
@@ -71,5 +74,14 @@ class WorkflowWatcher:
 
             target = self.models_dir / ref.directory / ref.name
             self.downloader.ensure_present(target, url)
+
+        logging.info(f"Finished downloading all models for {path.name}")
+
+        inputs = get_workflow_inputs(workflow)
+        if inputs:
+            logging.info(f"Workflow requires {len(inputs)} input files")
+            download_workflow_inputs(workflow, self.input_dir)
+        else:
+            logging.debug("No input files referenced in workflow")
 
         self.state.mark_processed(path, mtime)

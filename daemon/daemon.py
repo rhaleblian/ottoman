@@ -46,6 +46,7 @@ def main():
         downloader=downloader,
         state=state,
         models_dir=config.get("models_directory", config["cache_directory"]),
+        input_dir=config.get("input_directory", config["cache_directory"]),
     )
 
     logging.info("Daemon initialized. Watching for workflow changes.")

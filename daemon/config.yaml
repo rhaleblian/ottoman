@@ -1,12 +1,16 @@
 # Directories the daemon will watch for workflow changes
 watch_directories:
-  - "/app/host_workflows"
+  - "/mnt/c/Users/ray/Developer/ComfyUI/user/default/workflows"
 
 # Local cache directory for downloaded models
-cache_directory: "/app/daemon/cache"
+cache_directory: "/tmp"
 
 # Root models directory (models are organized as {models_directory}/{type}/{name})
-models_directory: "/app/daemon/cache"
+models_directory: "/mnt/c/Users/ray/Developer/ComfyUI/models"
+
+# Input directory where workflow input files (images, videos, audio) live
+input_directory: "/mnt/c/Users/ray/Developer/ComfyUI/input"
+
 
 # Model resolution endpoints
 model_sources:

@@ -36,6 +36,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -223,6 +224,16 @@ def get_workflow_models_from_file(path: str | Path) -> list[ModelRef]:
 
 _CHUNK = 1 << 17   # 128 KiB read chunks
 _BAR_WIDTH = 38
+_GITHUB_INPUT_BASE = "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/input"
+
+# Node types that load files from ComfyUI's input/ directory,
+# and the input keys that hold the filename.
+_INPUT_LOADERS: dict[str, tuple[str, ...]] = {
+    "LoadImage": ("image",),
+    "LoadImageMask": ("image",),
+    "LoadVideo": ("video",),
+    "LoadAudio": ("audio",),
+}
 
 
 def _fmt_size(n: int) -> str:
@@ -231,6 +242,14 @@ def _fmt_size(n: int) -> str:
             return f"{n:.1f} {unit}"
         n /= 1024
     return f"{n:.1f} TB"
+
+
+def _fmt_rate(n: float) -> str:
+    for unit in ("B/s", "KB/s", "MB/s", "GB/s"):
+        if n < 1024:
+            return f"{n:.1f} {unit}"
+        n /= 1024
+    return f"{n:.1f} TB/s"
 
 
 def _progress(label: str, done: int, total: int | None) -> None:
@@ -264,12 +283,13 @@ def _download_file(
     dest: Path,
     hf_token: str | None = None,
     civitai_token: str | None = None,
-) -> str:
+) -> tuple[str, int, float]:
     """Download *url* to *dest*, resuming if a .part file exists.
 
-    Returns the status string: 'downloaded' or 'resumed'.
+    Returns (status, file_size, elapsed_seconds).
     Raises urllib.error.URLError / OSError on failure.
     """
+    start = time.time()
     part = dest.with_suffix(dest.suffix + ".part")
     resume_from = part.stat().st_size if part.exists() else 0
 
@@ -289,7 +309,8 @@ def _download_file(
 
         # If the complete file already exists at the right size, skip.
         if dest.exists() and total and dest.stat().st_size == total:
-            return "skipped"
+            elapsed = time.time() - start
+            return ("skipped", total, elapsed)
 
         label = dest.name
         mode = "ab" if resume_from else "wb"
@@ -306,7 +327,8 @@ def _download_file(
 
     sys.stderr.write("\n")
     part.rename(dest)
-    return "resumed" if resume_from else "downloaded"
+    elapsed = time.time() - start
+    return ("resumed" if resume_from else "downloaded", done, elapsed)
 
 
 def download_workflow_models(
@@ -341,6 +363,8 @@ def download_workflow_models(
     models_dir = Path(models_dir)
     refs = get_workflow_models(workflow)
     results: list[DownloadResult] = []
+    total_bytes = 0
+    total_time = 0.0
 
     for i, ref in enumerate(refs, 1):
         dest_dir = models_dir / ref.directory
@@ -362,16 +386,169 @@ def download_workflow_models(
         print(f"{prefix} GET     {ref.url}", file=sys.stderr)
 
         try:
-            status = _download_file(ref.url, dest, hf_token, civitai_token)
-            # _download_file may return "skipped" if sizes matched mid-way
+            status, file_size, elapsed = _download_file(
+                ref.url, dest, hf_token, civitai_token
+            )
             if status == "skipped":
                 print(f"{prefix} SKIP    {dest}", file=sys.stderr)
+            else:
+                rate = file_size / elapsed if elapsed > 0 else 0.0
+                total_bytes += file_size
+                total_time += elapsed
+                avg_rate = total_bytes / total_time if total_time > 0 else 0.0
+                print(
+                    f"{prefix} {status.upper():4s} {_fmt_size(file_size)} "
+                    f"to {dest} in {elapsed:.1f}s ({_fmt_rate(rate)} — "
+                    f"running avg {_fmt_rate(avg_rate)})",
+                    file=sys.stderr,
+                )
             results.append(DownloadResult(model=ref, dest=dest, status=status))
         except Exception as exc:
             part = dest.with_suffix(dest.suffix + ".part")
             print(f"\n{prefix} ERROR   {ref.name}: {exc}", file=sys.stderr)
             results.append(DownloadResult(model=ref, dest=dest, status="error",
                                           error=str(exc)))
+
+    downloaded = sum(1 for r in results if r.status in ("downloaded", "resumed"))
+    skipped = sum(1 for r in results if r.status == "skipped")
+    errors = sum(1 for r in results if r.status == "error")
+    print(
+        f"All models processed: {downloaded} downloaded, "
+        f"{skipped} skipped, {errors} errors",
+        file=sys.stderr,
+    )
+
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Workflow input files (images, videos, audio)
+# ---------------------------------------------------------------------------
+
+def get_workflow_inputs(workflow: dict[str, Any]) -> list[str]:
+    """Return sorted unique input filenames referenced in *workflow*.
+
+    Looks at known input-loading node types (LoadImage, LoadVideo, …)
+    and collects the filename values from their inputs.
+    Handles both UI and API format workflows.
+    """
+    filenames: list[str] = []
+
+    if _is_api_format(workflow):
+        for node_data in workflow.values():
+            if not isinstance(node_data, dict):
+                continue
+            class_type = node_data.get("class_type", "")
+            keys = _INPUT_LOADERS.get(class_type)
+            if not keys:
+                continue
+            inputs = node_data.get("inputs") or {}
+            if isinstance(inputs, dict):
+                for key in keys:
+                    val = inputs.get(key)
+                    if isinstance(val, str):
+                        filenames.append(val)
+    else:
+        for node in workflow.get("nodes") or []:
+            class_type = node.get("type", "")
+            keys = _INPUT_LOADERS.get(class_type)
+            if not keys:
+                continue
+            inputs = node.get("inputs") or {}
+            if isinstance(inputs, dict):
+                for key in keys:
+                    val = inputs.get(key)
+                    if isinstance(val, str):
+                        filenames.append(val)
+            # Also check widgets_values first element for LoadImage
+            if "LoadImage" in class_type:
+                widgets = node.get("widgets_values")
+                if widgets and isinstance(widgets[0], str):
+                    filenames.append(widgets[0])
+
+    return sorted(set(filenames))
+
+
+def _download_input_file(
+    filename: str,
+    dest: Path,
+) -> str:
+    """Download *filename* from the workflow_templates input repo to *dest*.
+
+    Returns status: 'downloaded', 'skipped', or 'not_found'.
+    """
+    from urllib.request import urlopen, Request
+    from urllib.error import HTTPError
+
+    if dest.exists():
+        return "skipped"
+
+    url = f"{_GITHUB_INPUT_BASE}/{filename}"
+    req = Request(url, headers={"User-Agent": "comfy-model-daemon/1.0"})
+
+    try:
+        with urlopen(req, timeout=30) as resp:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            with open(dest, "wb") as f:
+                while True:
+                    chunk = resp.read(1 << 17)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+        return "downloaded"
+    except HTTPError as e:
+        if e.code == 404:
+            return "not_found"
+        raise
+
+
+def download_workflow_inputs(
+    workflow: dict[str, Any],
+    input_dir: str | Path,
+) -> dict[str, str]:
+    """Download every input file referenced in *workflow* into *input_dir*.
+
+    Returns a dict mapping filename → status ('downloaded', 'skipped',
+    'not_found', 'error').
+    """
+    input_dir = Path(input_dir)
+    filenames = get_workflow_inputs(workflow)
+    results: dict[str, str] = {}
+    total = len(filenames)
+
+    for i, name in enumerate(filenames, 1):
+        dest = input_dir / name
+        prefix = f"[{i}/{total}]"
+
+        try:
+            status = _download_input_file(name, dest)
+            results[name] = status
+            if status == "downloaded":
+                size_str = _fmt_size(dest.stat().st_size)
+                print(
+                    f"{prefix} INPUT   {size_str} to {dest}",
+                    file=sys.stderr,
+                )
+            elif status == "skipped":
+                print(f"{prefix} SKIP    {dest}", file=sys.stderr)
+            else:
+                print(
+                    f"{prefix} MISS    {name} not found in workflow_templates/input",
+                    file=sys.stderr,
+                )
+        except Exception as exc:
+            results[name] = "error"
+            print(f"{prefix} ERROR   {name}: {exc}", file=sys.stderr)
+
+    downloaded = sum(1 for v in results.values() if v == "downloaded")
+    skipped = sum(1 for v in results.values() if v == "skipped")
+    missing = sum(1 for v in results.values() if v == "not_found")
+    errors = sum(1 for v in results.values() if v == "error")
+    print(
+        f"Input files processed: {downloaded} downloaded, "
+        f"{skipped} skipped, {missing} missing, {errors} errors",
+        file=sys.stderr,
+    )
 
     return results
 
@@ -396,6 +573,14 @@ def _main() -> None:
         help="Root ComfyUI models/ directory (required with --download)",
     )
     parser.add_argument(
+        "--download-inputs", action="store_true",
+        help="Download input files from workflow_templates repo into --input-dir",
+    )
+    parser.add_argument(
+        "--input-dir", default=None, metavar="DIR",
+        help="ComfyUI input/ directory (required with --download-inputs)",
+    )
+    parser.add_argument(
         "--hf-token", default=None, metavar="TOKEN",
         help="HuggingFace API token for gated repos (also reads HF_TOKEN env var)",
     )
@@ -409,11 +594,12 @@ def _main() -> None:
     )
     args = parser.parse_args()
 
+    with open(args.workflow, encoding="utf-8") as f:
+        workflow = json.load(f)
+
     if args.download:
         if not args.models_dir:
             parser.error("--models-dir is required when using --download")
-        with open(args.workflow, encoding="utf-8") as f:
-            workflow = json.load(f)
         results = download_workflow_models(
             workflow,
             models_dir=args.models_dir,
@@ -423,8 +609,14 @@ def _main() -> None:
         errors = [r for r in results if r.status == "error"]
         if errors:
             sys.exit(1)
-    else:
-        models = get_workflow_models_from_file(args.workflow)
+
+    if args.download_inputs:
+        if not args.input_dir:
+            parser.error("--input-dir is required when using --download-inputs")
+        download_workflow_inputs(workflow, input_dir=args.input_dir)
+
+    if not args.download and not args.download_inputs:
+        models = get_workflow_models(workflow)
         if not models:
             print("No model references found.", file=sys.stderr)
             sys.exit(0)
