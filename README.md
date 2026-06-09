@@ -1,12 +1,12 @@
-# comfy-model-daemon
+# ottoman
 
-A lightweight, file‑driven daemon that monitors ComfyUI workflow files, resolves required models, downloads missing assets, and maintains a local cache. Designed for hybrid Docker + local development.
+A lightweight, file‑driven watcher daemon that monitors ComfyUI workflow files, resolves required models and inputs, downloads missing assets, and maintains a local cache. Designed for hybrid Docker + local development.
 
 ## Features
 - Watches workflow directories for changes
 - Parses ComfyUI workflow JSON
 - Resolves model dependencies
-- Downloads missing models with retry logic
+- Downloads missing models and inputs with retry logic
 - Maintains a persistent cache directory
 - Runs cleanly in Docker or local dev
 
