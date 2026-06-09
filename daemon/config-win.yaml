@@ -1,0 +1,27 @@
+# Directories the daemon will watch for workflow changes
+watch_directories:
+  - "c:/home/ray/Developer/ComfyUI/user/default/workflows"
+
+# Local cache directory for downloaded models
+cache_directory: "c:/home/ray/Developer/ComfyUI/cache"
+
+# Root models directory (models are organized as {models_directory}/{type}/{name})
+models_directory: "c:/home/ray/Developer/ComfyUI/models"
+
+# Model resolution endpoints
+model_sources:
+  - name: "civitai"
+    base_url: "https://civitai.com/api/download/models/"
+  - name: "huggingface"
+    base_url: "https://huggingface.co/"
+
+# Download behavior
+download:
+  retries: 3
+  backoff_seconds: 2
+  timeout_seconds: 30
+
+# Logging
+logging:
+  level: "INFO"
+
