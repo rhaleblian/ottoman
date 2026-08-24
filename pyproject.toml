@@ -1,5 +1,5 @@
 [project]
-name = "comfy-model-daemon"
+name = "ottoman"
 version = "0.1.0"
 description = "A lightweight daemon that resolves and downloads models required by ComfyUI workflows."
 authors = [

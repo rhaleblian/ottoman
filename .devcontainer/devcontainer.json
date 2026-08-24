@@ -1,5 +1,5 @@
 {
-  "name": "comfy-model-daemon-dev",
+  "name": "ottoman-dev",
   "dockerFile": "Dockerfile",
   "context": "..",
 

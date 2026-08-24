@@ -1,9 +1,9 @@
 services:
-  comfy-model-daemon:
+  ottoman:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: comfy-model-daemon
+    container_name: ottoman
     volumes:
       - ${COMFY_INPUT_DIR}:/app/input
       - ${COMFY_MODELS_DIR}:/app/models

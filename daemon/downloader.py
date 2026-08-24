@@ -22,22 +22,17 @@ def _fmt_rate(n: float) -> str:
 
 class ModelDownloader:
     """
-    Downloads model files into the cache directory.
+    Downloads model files to the models directory.
     Ensures atomic writes and retry/backoff behavior.
     """
 
-    def __init__(self, cache_dir: Path, retries: int, backoff: int, timeout: int):
-        self.cache_dir = cache_dir
-
+    def __init__(self, retries: int, backoff: int, timeout: int):
         self.retries = retries
         self.backoff = backoff
         self.timeout = timeout
 
         self._total_bytes = 0
         self._total_time = 0.0
-
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        logging.info(f"Model cache directory: {self.cache_dir}")
 
     def ensure_present(self, target: Path, url: str):
         """

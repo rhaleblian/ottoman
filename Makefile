@@ -1,5 +1,5 @@
 # -----------------------------
-# Comfy Model Daemon Makefile
+# Ottoman Makefile
 # -----------------------------
 
 PYTHON := python3
@@ -30,5 +30,4 @@ docker-up:
 clean:
 	find . -type f -name "*.pyc" -delete
 	find . -type d -name "__pycache__" -exec rm -rf {} +
-	rm -f daemon/cache/state.json
 

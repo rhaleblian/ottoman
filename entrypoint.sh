@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "[daemon] starting comfy-model-daemon..."
+echo "[daemon] starting ottoman..."
 exec python -m daemon.daemon
 

@@ -1,6 +1,5 @@
 import json
 import logging
-import sys
 from pathlib import Path
 from typing import List
 
@@ -14,12 +13,11 @@ class WorkflowWatcher:
     resolves them to URLs, and triggers downloads.
     """
 
-    def __init__(self, directories: List[str], resolver, downloader, state,
+    def __init__(self, directories: List[str], resolver, downloader,
                  models_dir: str, input_dir: str):
         self.directories = [Path(d) for d in directories]
         self.resolver = resolver
         self.downloader = downloader
-        self.state = state
         self.models_dir = Path(models_dir)
         self.input_dir = Path(input_dir)
 
@@ -29,6 +27,15 @@ class WorkflowWatcher:
         self.input_dir.mkdir(parents=True, exist_ok=True)
 
         logging.info(f"Watching {len(self.directories)} workflow directories")
+
+        for d in self.directories:
+            workflows = sorted(d.glob("*.json"))
+            if workflows:
+                logging.info(f"Found {len(workflows)} workflow(s) in {d}:")
+                for wf in workflows:
+                    logging.info(f"  {wf.name}")
+            else:
+                logging.info(f"No workflow files found in {d}")
 
     def poll(self):
         """
@@ -41,15 +48,8 @@ class WorkflowWatcher:
 
     def _process_workflow(self, path: Path):
         """
-        If the workflow file changed since last seen, parse it and handle models.
+        Parse a workflow file and ensure all required models and inputs are present.
         """
-        mtime = path.stat().st_mtime
-
-        if not self.state.should_process(path, mtime):
-            return
-
-        logging.info(f"Detected workflow change: {path}")
-
         try:
             with path.open("r") as f:
                 workflow = json.load(f)
@@ -58,11 +58,6 @@ class WorkflowWatcher:
             return
 
         refs = get_workflow_models(workflow)
-
-        for ref in refs:
-            print(f"  {ref}", file=sys.stderr)
-
-        logging.info(f"Workflow requires {len(refs)} models")
 
         for ref in refs:
             url = ref.url
@@ -75,13 +70,6 @@ class WorkflowWatcher:
             target = self.models_dir / ref.directory / ref.name
             self.downloader.ensure_present(target, url)
 
-        logging.info(f"Finished downloading all models for {path.name}")
-
         inputs = get_workflow_inputs(workflow)
         if inputs:
-            logging.info(f"Workflow requires {len(inputs)} input files")
             download_workflow_inputs(workflow, self.input_dir)
-        else:
-            logging.debug("No input files referenced in workflow")
-
-        self.state.mark_processed(path, mtime)

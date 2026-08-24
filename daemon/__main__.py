@@ -1,5 +1,5 @@
 """
-Entry point for running the comfy-model-daemon package via:
+Entry point for running the ottoman package via:
 
     python -m daemon
 """

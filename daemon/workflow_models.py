@@ -484,7 +484,7 @@ def _download_input_file(
         return "skipped"
 
     url = f"{_GITHUB_INPUT_BASE}/{filename}"
-    req = Request(url, headers={"User-Agent": "comfy-model-daemon/1.0"})
+    req = Request(url, headers={"User-Agent": "ottoman/1.0"})
 
     try:
         with urlopen(req, timeout=30) as resp:

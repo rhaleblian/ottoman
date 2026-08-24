@@ -15,17 +15,8 @@ venv/
 .vscode/
 .idea/
 
-# Local cache directory
-daemon/cache/
-
 # Docker artifacts
 *.log
-
-# -------------------------
-# Project-specific
-# -------------------------
-daemon/cache/
-daemon/cache/state.json
 
 # -------------------------
 # Devcontainer + VS Code

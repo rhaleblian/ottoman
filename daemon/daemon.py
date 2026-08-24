@@ -6,7 +6,6 @@ from pathlib import Path
 from .watcher import WorkflowWatcher
 from .model_resolver import ModelResolver
 from .downloader import ModelDownloader
-from .state import DaemonState
 
 
 def load_config():
@@ -28,13 +27,8 @@ def main():
 
     logging.info("Loading daemon configuration")
 
-    state = DaemonState(
-        cache_dir=Path(config["cache_directory"])
-    )
-
     resolver = ModelResolver(config["model_sources"])
     downloader = ModelDownloader(
-        cache_dir=Path(config["cache_directory"]),
         retries=config["download"]["retries"],
         backoff=config["download"]["backoff_seconds"],
         timeout=config["download"]["timeout_seconds"],
@@ -44,9 +38,8 @@ def main():
         directories=config["watch_directories"],
         resolver=resolver,
         downloader=downloader,
-        state=state,
-        models_dir=config.get("models_directory", config["cache_directory"]),
-        input_dir=config.get("input_directory", config["cache_directory"]),
+        models_dir=config["models_directory"],
+        input_dir=config["input_directory"],
     )
 
     logging.info("Daemon initialized. Watching for workflow changes.")
