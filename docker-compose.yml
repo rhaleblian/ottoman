@@ -10,5 +10,8 @@ services:
       - ${COMFY_WORKFLOWS_DIR}:/app/workflows
     environment:
       - PYTHONUNBUFFERED=1
+      - COMFY_MODELS_DIR=${COMFY_MODELS_DIR}
+      - COMFY_INPUT_DIR=${COMFY_INPUT_DIR}
+      - COMFY_WORKFLOWS_DIR=${COMFY_WORKFLOWS_DIR}
     restart: unless-stopped
 
