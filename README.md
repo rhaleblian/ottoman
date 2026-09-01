@@ -10,7 +10,7 @@ You can save template workflows and easily obtain the models and inputs they nee
 - Resolves model dependencies
 - Downloads missing models and inputs with retry logic
 - Maintains a persistent cache directory
-- Runs cleanly in Docker or local dev
+- Runs in Docker or as a shell subprocess
 
 ## Running
 In your shell, set the environment variables that `docker-compose.yml` uses to know where your Comfy files should go.
@@ -36,5 +36,3 @@ Use the included devcontainer for a fully configured environment:
     devcontainer open .
 
 The daemon code is live‑mounted for rapid iteration.
-
-
