@@ -22,6 +22,9 @@ Or run locally:
     python -m daemon.daemon
 
 ## Docker
+
+In your shell, set the environment variables that `docker-compose.yml` uses to know where your Comfy files should go.
+
 Build and run:
 
     docker compose up --build
