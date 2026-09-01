@@ -1,6 +1,8 @@
 # ottoman
 
-A lightweight, file‑driven watcher daemon that monitors ComfyUI workflow files, resolves required models and inputs, downloads missing assets, and maintains a local cache. Designed for hybrid Docker + local development.
+A lightweight, file‑driven watcher daemon that monitors ComfyUI workflow files on a server instance, resolves required models and inputs, downloads missing assets, and maintains a local cache. Designed for hybrid Docker + local development.
+
+You can save template workflows and easily obtain the models and inputs they need to run.
 
 ## Features
 - Watches workflow directories for changes
