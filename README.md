@@ -23,6 +23,8 @@ Or run locally:
 
     python -m daemon.daemon
 
+provided that you already have the prerequisites that the container would otherwise provide.
+
 ## Configuration
 Edit `daemon/config.yaml` to control:
 - watched directories  
