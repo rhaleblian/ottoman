@@ -20,6 +20,16 @@ def _fmt_rate(n: float) -> str:
     return f"{n:.1f} TB/s"
 
 
+def _parse_content_length(value: str | None) -> int | None:
+    if not value:
+        return None
+    try:
+        size = int(value)
+        return size if size > 0 else None
+    except ValueError:
+        return None
+
+
 class ModelDownloader:
     """
     Downloads model files into the cache directory.
@@ -61,7 +71,9 @@ class ModelDownloader:
 
         for attempt in range(1, self.retries + 1):
             try:
-                bytes_written, elapsed = self._download(url, tmp_path)
+                bytes_written, elapsed = self._download(
+                    url, tmp_path, label=target.name
+                )
                 tmp_path.rename(target)
 
                 rate = bytes_written / elapsed if elapsed > 0 else 0.0
@@ -88,20 +100,42 @@ class ModelDownloader:
 
         logging.error(f"Failed to download model after {self.retries} attempts")
 
-    def _download(self, url: str, tmp_path: Path) -> tuple[int, float]:
+    def _download(
+        self, url: str, tmp_path: Path, label: str | None = None
+    ) -> tuple[int, float]:
         """
         Perform the actual HTTP GET and stream to disk.
         Returns (bytes_written, elapsed_seconds).
         """
         start = time.time()
         total = 0
+        display_name = label or tmp_path.name
         with requests.get(url, stream=True, timeout=self.timeout) as r:
             r.raise_for_status()
+            expected_size = _parse_content_length(r.headers.get("Content-Length"))
+            next_pct = 10
 
             with tmp_path.open("wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
                         total += len(chunk)
+                        if expected_size:
+                            pct = min(100, (total * 100) // expected_size)
+                            if pct >= next_pct:
+                                milestone = (pct // 10) * 10
+                                elapsed_so_far = time.time() - start
+                                rate = (
+                                    total / elapsed_so_far
+                                    if elapsed_so_far > 0
+                                    else 0.0
+                                )
+                                logging.info(
+                                    f"Downloading {display_name}: {milestone}% "
+                                    f"({_fmt_size(total)} / "
+                                    f"{_fmt_size(expected_size)}, "
+                                    f"{_fmt_rate(rate)})"
+                                )
+                                next_pct = milestone + 10
         elapsed = time.time() - start
         return (total, elapsed)

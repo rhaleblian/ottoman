@@ -223,7 +223,6 @@ def get_workflow_models_from_file(path: str | Path) -> list[ModelRef]:
 # ---------------------------------------------------------------------------
 
 _CHUNK = 1 << 17   # 128 KiB read chunks
-_BAR_WIDTH = 38
 _GITHUB_INPUT_BASE = "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/input"
 
 # Node types that load files from ComfyUI's input/ directory,
@@ -252,16 +251,30 @@ def _fmt_rate(n: float) -> str:
     return f"{n:.1f} TB/s"
 
 
-def _progress(label: str, done: int, total: int | None) -> None:
-    if total:
-        pct = done / total
-        filled = int(_BAR_WIDTH * pct)
-        bar = "█" * filled + "░" * (_BAR_WIDTH - filled)
-        line = f"\r  [{bar}] {pct:5.1%}  {_fmt_size(done)}/{_fmt_size(total)}  {label}"
-    else:
-        line = f"\r  {_fmt_size(done)} downloaded  {label}"
-    sys.stderr.write(line)
-    sys.stderr.flush()
+def _report_progress(
+    label: str,
+    done: int,
+    total: int | None,
+    next_pct: int,
+    elapsed: float,
+    bytes_since_start: int | None = None,
+) -> int:
+    """Print progress to stderr when *done* crosses the *next_pct* 10% threshold."""
+    if not total or total <= 0:
+        return next_pct
+    pct = min(100, (done * 100) // total)
+    if pct < next_pct:
+        return next_pct
+    milestone = (pct // 10) * 10
+    transferred = done if bytes_since_start is None else bytes_since_start
+    rate = transferred / elapsed if elapsed > 0 else 0.0
+    print(
+        f"  {label}: {milestone}% "
+        f"({_fmt_size(done)} / {_fmt_size(total)}, {_fmt_rate(rate)})",
+        file=sys.stderr,
+        flush=True,
+    )
+    return milestone + 10
 
 
 def _build_headers(url: str, hf_token: str | None, civitai_token: str | None,
@@ -315,6 +328,11 @@ def _download_file(
         label = dest.name
         mode = "ab" if resume_from else "wb"
         done = resume_from
+        if total and total > 0 and resume_from > 0:
+            resumed_pct = min(100, (resume_from * 100) // total)
+            next_pct = ((resumed_pct // 10) + 1) * 10
+        else:
+            next_pct = 10
 
         with open(part, mode) as fh:
             while True:
@@ -323,9 +341,15 @@ def _download_file(
                     break
                 fh.write(chunk)
                 done += len(chunk)
-                _progress(label, done, total)
+                next_pct = _report_progress(
+                    label,
+                    done,
+                    total,
+                    next_pct,
+                    time.time() - start,
+                    bytes_since_start=done - resume_from,
+                )
 
-    sys.stderr.write("\n")
     part.rename(dest)
     elapsed = time.time() - start
     return ("resumed" if resume_from else "downloaded", done, elapsed)
@@ -405,7 +429,7 @@ def download_workflow_models(
             results.append(DownloadResult(model=ref, dest=dest, status=status))
         except Exception as exc:
             part = dest.with_suffix(dest.suffix + ".part")
-            print(f"\n{prefix} ERROR   {ref.name}: {exc}", file=sys.stderr)
+            print(f"{prefix} ERROR   {ref.name}: {exc}", file=sys.stderr)
             results.append(DownloadResult(model=ref, dest=dest, status="error",
                                           error=str(exc)))
 
@@ -487,14 +511,30 @@ def _download_input_file(
     req = Request(url, headers={"User-Agent": "comfy-model-daemon/1.0"})
 
     try:
+        start = time.time()
         with urlopen(req, timeout=30) as resp:
+            cl = resp.headers.get("Content-Length")
+            try:
+                total = int(cl) if cl and int(cl) > 0 else None
+            except ValueError:
+                total = None
+            done = 0
+            next_pct = 10
             dest.parent.mkdir(parents=True, exist_ok=True)
             with open(dest, "wb") as f:
                 while True:
-                    chunk = resp.read(1 << 17)
+                    chunk = resp.read(_CHUNK)
                     if not chunk:
                         break
                     f.write(chunk)
+                    done += len(chunk)
+                    next_pct = _report_progress(
+                        dest.name,
+                        done,
+                        total,
+                        next_pct,
+                        time.time() - start,
+                    )
         return "downloaded"
     except HTTPError as e:
         if e.code == 404:
