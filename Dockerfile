@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates git && \
+    curl ca-certificates git gosu && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -16,12 +16,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy daemon code
 COPY daemon /app/daemon
-RUN mkdir /app/daemon/cache
+RUN mkdir -p /app/daemon/cache
 COPY entrypoint.sh /app/entrypoint.sh
 
-RUN chmod +x /app/entrypoint.sh
-
-USER appuser
+RUN chmod +x /app/entrypoint.sh && chown -R appuser:appuser /app
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 
