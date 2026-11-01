@@ -10,5 +10,7 @@ services:
       - ${COMFY_WORKFLOWS_DIR}:/app/workflows
     environment:
       - PYTHONUNBUFFERED=1
+      - USER_ID=${USER_ID:-1000}
+      - GROUP_ID=${GROUP_ID:-1000}
     restart: unless-stopped
 
