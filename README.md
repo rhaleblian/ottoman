@@ -2,7 +2,9 @@
 
 A lightweight, file‑driven watcher daemon that monitors ComfyUI workflow files on a server instance, resolves required models and inputs, downloads missing assets, and maintains a local cache. Designed for hybrid Docker + local development.
 
-You can save template workflows and easily obtain the models and inputs they need to run.
+When you save a workflow back to your server, the watcher sees the change and downloads missing models and inputs.
+
+This is distinct from what @rayhaleblian see that Comfy Manager does, which appears to be downloading models to the client, which need to be moved to the server and organized.
 
 ## Features
 - Watches workflow directories for changes
@@ -13,7 +15,7 @@ You can save template workflows and easily obtain the models and inputs they nee
 - Runs in Docker or as a shell subprocess
 
 ## Running
-In your shell, set the environment variables that `docker-compose.yml` uses to know where your Comfy files should go.
+In your shell or a .env file, set the environment variables that `docker-compose.yml` uses to know where your Comfy files should go.
 
 Build and run:
 
